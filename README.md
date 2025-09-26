@@ -4,36 +4,39 @@ A comprehensive library of Arduino LED projects featuring games, effects, and in
 
 ![Collection](https://img.shields.io/badge/Projects-7_Complete-brightgreen) ![Hardware](https://img.shields.io/badge/Hardware-Arduino_Nano-blue) ![LEDs](https://img.shields.io/badge/LEDs-WS2812B-orange)
 
+> [!NOTE]
+> This is just the beginning of my experimentation—many more projects are on the way! I plan to add detailed wiring diagrams and pictures for all projects to better showcase the concepts and final designs.
+
 ## 🎮 Project Collection
 
 ### **Interactive Games**
 | Project | Description | LEDs | Features |
 |---|---|---|---|
-| **[Pong Game](README_Pong_Game.md)** | Two-player Pong with dynamic ball physics | 220 (10×22) | Smoothed controls, rally speed, visual feedback |
-| **[Dino Runner](README_Dino_Game.md)** | Chrome Dino-inspired endless runner | 198 (9×22) | Jump/duck, particles, advanced physics |
+| **[Pong Game](./Interactive%20Games/README_Pong_Game.md)** | Two-player Pong with dynamic ball physics | 220 (10×22) | Smoothed controls, rally speed, visual feedback |
+| **[Dino Runner](./Interactive%20Games/README_Dino_Game.md)** | Chrome Dino-inspired endless runner | 198 (9×22) | Jump/duck, particles, advanced physics |
 
 ### **Creative Tools**
 | Project | Description | LEDs | Features |  
 |---|---|---|---|
-| **[Drawing Machine](README_Drawing_Machine.md)** | Interactive drawing with potentiometers | 220 (10×22) | Color mixing, pen modes, canvas clear |
+| **[Drawing Machine](./Creative%20Tools/README_Drawing_Machine.md)** | Interactive drawing with potentiometers | 220 (10×22) | Color mixing, pen modes, canvas clear |
 
 ### **Visual Effects**
 | Project | Description | LEDs | Features |
 |---|---|---|---|
-| **[Music Visualizer](README_Music_Visualizer.md)** | Real-time audio spectrum analyzer | 220 (10×22) | FFT analysis, 7-bar visualizer, mic input |
-| **[Effects Playlist](README_LED_Effects_Playlist.md)** | 8 professional effects with auto-cycle | 198 (9×22) | Fireworks, fire, rainbow, particles |
-| **[Liquid Cooler](README_Liquid_Cooler.md)** | PC cooling simulation with temperature | 20 (linear) | Multi-zone, thermal response, warnings |
+| **[Music Visualizer](./Visual%20Effects/README_Music_Visualizer.md)** | Real-time audio spectrum analyzer | 220 (10×22) | FFT analysis, 7-bar visualizer, mic input |
+| **[Effects Playlist](./Visual%20Effects/README_LED_Effects_Playlist.md)** | 8 professional effects with auto-cycle | 198 (9×22) | Fireworks, fire, rainbow, particles |
+| **[Liquid Cooler](./Visual%20Effects/README_Liquid_Cooler.md)** | PC cooling simulation with temperature | 20 (linear) | Multi-zone, thermal response, warnings |
 
 ### **Drivers & Utilities**
 | Project | Description | LEDs | Features |
 |---|---|---|---|
-| **[Matrix Driver](README_MatrixDriver.md)** | Serial-controlled driver for matrices | 198 (9×22) | Serial protocol, full-frame updates, brightness control |
+| **[Matrix Driver](./Drivers%20&%20Utilities/README_MatrixDriver.md)** | Serial-controlled driver for matrices | 198 (9×22) | Serial protocol, full-frame updates, brightness control |
 
 
 ## 🔧 Hardware Requirements
 
 ### **Common Components**
-- **Arduino Nano/Uno** (recommended) or compatible microcontroller
+- **Arduino Nano** (recommended) or compatible microcontroller
 - **WS2812B LEDs** (various configurations)
 - **5V Power Supply** (capacity depends on LED count)
 - **Capacitors** (470µF-1000µF for power stability)
@@ -44,9 +47,9 @@ A comprehensive library of Arduino LED projects featuring games, effects, and in
 Pong Game:        10×22 = 220 LEDs (serpentine)
 Drawing Machine:  10×22 = 220 LEDs (serpentine)
 Music Visualizer: 10×22 = 220 LEDs (serpentine)
-Dino Game:        10×22 = 198 LEDs (serpentine)
-Effects Playlist: 10×22 = 198 LEDs (serpentine)
-Matrix Driver:    10×22 = 198 LEDs (serpentine)
+Dino Game:         9×22 = 198 LEDs (serpentine)
+Effects Playlist:  9×22 = 198 LEDs (serpentine)
+Matrix Driver:     9×22 = 198 LEDs (serpentine)
 Liquid Cooler:    20 LEDs (linear strip)
 ```
 

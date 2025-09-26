@@ -1,0 +1,16 @@
+# Arduino build files
+*.ino.hex
+*.ino.elf
+*.ino.bin
+*.ino.eep
+*.a
+*.o
+
+# Local configuration
+.vscode/c_cpp_properties.json
+.vscode/launch.json
+.vscode/settings.json
+
+# Other
+*~
+*.tmp

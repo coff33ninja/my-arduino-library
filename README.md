@@ -7,6 +7,12 @@ A comprehensive library of Arduino LED projects featuring games, effects, and in
 > [!NOTE]
 > This is just the beginning of my experimentation—many more projects are on the way! I plan to add detailed wiring diagrams and pictures for all projects to better showcase the concepts and final designs.
 
+## My DIY Matrix
+
+All projects in this collection are developed and tested on my first prototype: a custom-built 10x22 ARGB LED matrix using WS2812B LEDs (144 LEDs/meter). While the effects are currently tailored to these specifications, I plan to upgrade to larger sizes in the future and enhance the effects accordingly.
+
+## 🎮 Project Collection
+
 ## 🎮 Project Collection
 
 ### **Interactive Games**

@@ -13,8 +13,6 @@ All projects in this collection are developed and tested on my first prototype: 
 
 ## 🎮 Project Collection
 
-## 🎮 Project Collection
-
 ### **Interactive Games**
 | Project | Description | LEDs | Features |
 |---|---|---|---|

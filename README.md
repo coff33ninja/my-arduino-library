@@ -36,7 +36,7 @@ A comprehensive library of Arduino LED projects featuring games, effects, and in
 ## 🔧 Hardware Requirements
 
 ### **Common Components**
-- **Arduino Nano** (recommended) or compatible microcontroller
+- **Arduino Nano, Uno, or ESP32** (and other compatible microcontrollers)
 - **WS2812B LEDs** (various configurations)
 - **5V Power Supply** (capacity depends on LED count)
 - **Capacitors** (470µF-1000µF for power stability)

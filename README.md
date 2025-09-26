@@ -17,7 +17,7 @@ All projects in this collection are developed and tested on my first prototype: 
 | Project | Description | LEDs | Features |
 |---|---|---|---|
 | **[Pong Game](./Interactive%20Games/README_Pong_Game.md)** | Two-player Pong with dynamic ball physics | 220 (10×22) | Smoothed controls, rally speed, visual feedback |
-| **[Dino Runner](./Interactive%20Games/README_Dino_Game.md)** | Chrome Dino-inspired endless runner | 198 (9×22) | Jump/duck, particles, advanced physics |
+| **[Dino Runner](./Interactive%20Games/README_Dino_Game.md)** | Chrome Dino-inspired endless runner | 220 (10×22) | Jump/duck, particles, advanced physics |
 
 ### **Creative Tools**
 | Project | Description | LEDs | Features |  
@@ -36,7 +36,7 @@ All projects in this collection are developed and tested on my first prototype: 
 ### **Drivers & Utilities**
 | Project | Description | LEDs | Features |
 |---|---|---|---|
-| **[Matrix Driver](./Drivers%20&%20Utilities/README_MatrixDriver.md)** | Serial-controlled driver for matrices | 198 (9×22) | Serial protocol, full-frame updates, brightness control |
+| **[Matrix Driver](./Drivers%20&%20Utilities/README_MatrixDriver.md)** | Serial-controlled driver for matrices | 220 (10×22) | Serial protocol, full-frame updates, brightness control |
 
 
 ## 🔧 Hardware Requirements

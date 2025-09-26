@@ -26,7 +26,7 @@ A comprehensive library of Arduino LED projects featuring games, effects, and in
 | **[Sharingan](./Visual%20Effects/README_Sharingan.md)** | A mesmerizing animation of the Sharingan eye | 198 (9x22) | Spinning tomoe, pulsing iris |
 | **[Game of Life](./Visual%20Effects/README_GameOfLife.md)** | A simulation of Conway's Game of Life | 220 (10x22) | Cellular automaton, random start |
 | **[Music Visualizer](./Visual%20Effects/README_Music_Visualizer.md)** | Real-time audio spectrum analyzer | 220 (10×22) | FFT analysis, 7-bar visualizer, mic input |
-| **[Effects Playlist](./Visual%20Effects/README_LED_Effects_Playlist.md)** | 8 professional effects with auto-cycle | 198 (9×22) | Fireworks, fire, rainbow, particles |
+| **[Effects Playlist](./Visual%20Effects/README_LED_Effects_Playlist.md)** | 8 professional effects with auto-cycle | 220 (10×22) | Fireworks, fire, rainbow, particles |
 | **[Liquid Cooler](./Visual%20Effects/README_Liquid_Cooler.md)** | PC cooling simulation with temperature | 20 (linear) | Multi-zone, thermal response, warnings |
 
 ### **Drivers & Utilities**

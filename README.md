@@ -2,7 +2,7 @@
 
 A comprehensive library of Arduino LED projects featuring games, effects, and interactive applications for WS2812B LED matrices and strips.
 
-![Collection](https://img.shields.io/badge/Projects-7_Complete-brightgreen) ![Hardware](https://img.shields.io/badge/Hardware-Arduino_Nano-blue) ![LEDs](https://img.shields.io/badge/LEDs-WS2812B-orange)
+![Collection](https://img.shields.io/badge/Projects-8_In_Progress-yellow) ![Hardware](https://img.shields.io/badge/Hardware-Arduino_|_ESP32-blue) ![LEDs](https://img.shields.io/badge/LEDs-WS2812B-orange)
 
 > [!NOTE]
 > This is just the beginning of my experimentation—many more projects are on the way! I plan to add detailed wiring diagrams and pictures for all projects to better showcase the concepts and final designs.
@@ -23,6 +23,7 @@ A comprehensive library of Arduino LED projects featuring games, effects, and in
 ### **Visual Effects**
 | Project | Description | LEDs | Features |
 |---|---|---|---|
+| **[Game of Life](./Visual%20Effects/README_GameOfLife.md)** | A simulation of Conway's Game of Life | 220 (10x22) | Cellular automaton, random start |
 | **[Music Visualizer](./Visual%20Effects/README_Music_Visualizer.md)** | Real-time audio spectrum analyzer | 220 (10×22) | FFT analysis, 7-bar visualizer, mic input |
 | **[Effects Playlist](./Visual%20Effects/README_LED_Effects_Playlist.md)** | 8 professional effects with auto-cycle | 198 (9×22) | Fireworks, fire, rainbow, particles |
 | **[Liquid Cooler](./Visual%20Effects/README_Liquid_Cooler.md)** | PC cooling simulation with temperature | 20 (linear) | Multi-zone, thermal response, warnings |
@@ -47,9 +48,10 @@ A comprehensive library of Arduino LED projects featuring games, effects, and in
 Pong Game:        10×22 = 220 LEDs (serpentine)
 Drawing Machine:  10×22 = 220 LEDs (serpentine)
 Music Visualizer: 10×22 = 220 LEDs (serpentine)
-Dino Game:         9×22 = 198 LEDs (serpentine)
-Effects Playlist:  9×22 = 198 LEDs (serpentine)
-Matrix Driver:     9×22 = 198 LEDs (serpentine)
+Game of Life:     10×22 = 220 LEDs (serpentine)
+Dino Game:        10×22 = 220 LEDs (serpentine)
+Effects Playlist: 10×22 = 220 LEDs (serpentine)
+Matrix Driver:    10×22 = 220 LEDs (serpentine)
 Liquid Cooler:    20 LEDs (linear strip)
 ```
 
@@ -75,7 +77,7 @@ Each project includes comprehensive documentation:
 Select based on your hardware and interests:
 - **Gaming**: Pong or Dino Runner for interactive entertainment
 - **Art**: Drawing Machine for creative expression  
-- **Display**: Music Visualizer or Effects Playlist for a dynamic show
+- **Display**: Game of Life, Music Visualizer, or Effects Playlist for a dynamic show
 - **PC Modding**: Liquid Cooler for system monitoring
 - **Development**: Matrix Driver to create your own PC-controlled display
 
@@ -91,7 +93,7 @@ GND -> LED GND + Component Ground
 ```
 1. Install Arduino IDE
 2. Install required libraries (e.g., FastLED) via Library Manager
-3. Select Arduino Nano as target board
+3. Select your target board (Nano, Uno, ESP32, etc.)
 4. Upload chosen project sketch
 ```
 
@@ -113,6 +115,7 @@ LED Count -> Recommended Power Supply:
 - **Drawing Machine**: Multi-input coordination, real-time interaction
 - **Pong Game**: Game logic, collision detection, scoring
 - **Music Visualizer**: FFT and audio processing
+- **Game of Life**: Algorithmic simulation
 
 ### **Advanced**  
 - **Dino Game**: Complex physics, particle systems, AI features

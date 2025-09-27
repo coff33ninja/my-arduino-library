@@ -1,7 +1,7 @@
 /****************************************************************************************
  * Ping‑Pong Game for 10×22 ARGB LED Matrix (Serpentine) with Angled Bounces
- * –  Paddle flash replaces full‑screen flash on scoring
- * –  Rainbow animation is now limited to the paddles (called on a reset)
+ * –  Paddle‑only flashes for scoring, win, and reset events
+ * –  Rainbow animation now runs on the paddles only
  *
  * Hardware: Arduino Nano, WS2812B LEDs, 2 potentiometers (A0, A1),
  *           LED data on pin 6, reset button on pin 2
@@ -83,25 +83,30 @@ void clearMatrix() {
 }
 
 /* --------------------------------------------------------------
-   *** NEW *** – flash only the paddles (used on scoring)
+   Flash any colour *only* on the two paddles
    -------------------------------------------------------------- */
-void flashPaddles() {
-  // Temporarily colour both paddles white
+void flashPaddlesColor(CRGB col) {
   for (int i = 0; i < PADDLE_HEIGHT; i++) {
-    setPixel(0,                 paddle1Y + i, CRGB::White);                 // Left paddle
-    setPixel(MATRIX_WIDTH - 1,  paddle2Y + i, CRGB::White);                 // Right paddle
+    setPixel(0,                 paddle1Y + i, col);   // Left paddle
+    setPixel(MATRIX_WIDTH - 1,  paddle2Y + i, col);   // Right paddle
   }
   FastLED.show();
-  delay(50);                         // Visible flash duration
-  // Normal paddle colours are restored in the next draw cycle
+  delay(50);                                   // Visible flash length
 }
+
+/* --------------------------------------------------------------
+   Convenience wrappers
+   -------------------------------------------------------------- */
+void flashPaddles()           { flashPaddlesColor(CRGB::White); }   // Score flash
+void flashResetIndicator()   { flashPaddlesColor(CRGB::Purple); } // Reset‑button flash
+void flashWinPaddles(CRGB c) { flashPaddlesColor(c); }          // Win animation flash
 
 /* --------------------------------------------------------------
    *** DISABLED *** – full‑screen flash (kept for reference only)
    -------------------------------------------------------------- */
 // void flashScreen() {
 //   // Previously used to flash the entire matrix white on a score.
-//   // Disabled because the game now flashes only the paddles.
+//   // Disabled – we now flash only the paddles.
 //   // fill_solid(leds, NUM_LEDS, CRGB::White);
 //   // FastLED.show();
 //   // delay(50);
@@ -112,23 +117,22 @@ void flashPaddles() {
    -------------------------------------------------------------- */
 void rainbowPaddle() {
   // Animate a moving rainbow along the two paddle columns.
-  // The hue is shifted each frame to give a flowing effect.
-  uint8_t baseHue = beat8(10);               // Base hue drifts slowly
-  const uint8_t hueStep = 16;                // Colour distance between successive LEDs
+  uint8_t baseHue = beat8(10);          // Slowly drifting base hue
+  const uint8_t hueStep = 16;           // Colour distance between successive LEDs
 
-  // Draw left paddle
+  // Left paddle
   for (int i = 0; i < PADDLE_HEIGHT; i++) {
     uint8_t h = baseHue + i * hueStep;
     setPixel(0, paddle1Y + i, CHSV(h, 255, 255));
   }
-  // Draw right paddle
+  // Right paddle (different offset so the colours aren’t identical)
   for (int i = 0; i < PADDLE_HEIGHT; i++) {
-    uint8_t h = baseHue + i * hueStep + 64;  // Offset so the two paddles aren’t identical
+    uint8_t h = baseHue + i * hueStep + 64;
     setPixel(MATRIX_WIDTH - 1, paddle2Y + i, CHSV(h, 255, 255));
   }
 
   FastLED.show();
-  delay(30);                                 // Speed of the rainbow “throw”
+  delay(30);                           // Speed of the rainbow “throw”
 }
 
 /* --------------------------------------------------------------
@@ -144,12 +148,12 @@ void rainbowPaddle() {
 // }
 
 /* --------------------------------------------------------------
-   Draw paddles – left (blue) and right (green)
+   Draw paddles – normal colours (blue & green)
    -------------------------------------------------------------- */
 void drawPaddles() {
   for (int i = 0; i < PADDLE_HEIGHT; i++) {
-    setPixel(0,                 paddle1Y + i, CRGB::Blue);   // Left paddle
-    setPixel(MATRIX_WIDTH - 1,  paddle2Y + i, CRGB::Green);  // Right paddle
+    setPixel(0,                 paddle1Y + i, CRGB::Blue);
+    setPixel(MATRIX_WIDTH - 1,  paddle2Y + i, CRGB::Green);
   }
 }
 
@@ -189,13 +193,13 @@ bool checkResetButton() {
    -------------------------------------------------------------- */
 void drawScoreboard() {
 #if SCOREBOARD_ENABLED
-  // Player 1 score – columns 0‑9 (red tens, blue units)
+  // Player 1 – columns 0‑9 (red tens, blue units)
   int p1_tens   = score1 / 10;
   int p1_units  = score1 % 10;
   for (int i = 0; i < p1_tens;  i++) setPixel(i,                 0, CRGB::Red);
   for (int i = 0; i < p1_units; i++) setPixel(p1_tens + i,      0, CRGB::Blue);
 
-  // Player 2 score – columns 12‑21 (yellow tens, green units)
+  // Player 2 – columns 12‑21 (yellow tens, green units)
   int p2_tens   = score2 / 10;
   int p2_units  = score2 % 10;
   for (int i = 0; i < p2_tens;  i++) setPixel(12 + i,            0, CRGB::Yellow);
@@ -211,14 +215,14 @@ void updateBall() {
   ballX += ballDX;
   ballY += ballDY;
 
-  // Debug output (Serial only when scoreboard disabled)
 #if !SCOREBOARD_ENABLED
+  // Debug output (only when scoreboard is off)
   Serial.print("Ball: ("); Serial.print(ballX); Serial.print(", ");
   Serial.print(ballY); Serial.print(") Speed: "); Serial.println(ballSpeed);
 #endif
 
   // ---- Wall collisions (top / bottom) --------------------------------
-  int minY = SCOREBOARD_ENABLED ? 1 : 0;   // Keep top row free for scoreboard
+  int minY = SCOREBOARD_ENABLED ? 1 : 0;   // Top row reserved for scoreboard
   if (ballY < minY) {
     ballY = minY;
     ballDY = -ballDY;
@@ -227,62 +231,49 @@ void updateBall() {
     ballDY = -ballDY;
   }
 
-  // ---- Paddle collisions ------------------------------------------------
-#if BOUNCE_ANGLES                         // Angled bounce version
+  // ---- Paddle collisions (angled bounce option) ------------------------
+#if BOUNCE_ANGLES
   // ----- Left paddle ----------------------------------------------------
   if (ballX == 0 && ballY >= paddle1Y && ballY < paddle1Y + PADDLE_HEIGHT) {
-    // Flash paddle white (visual feedback)
-    for (int i = 0; i < PADDLE_HEIGHT; i++) setPixel(0, paddle1Y + i, CRGB::White);
-    FastLED.show(); delay(10);
+    // Paddle hit visual cue (white flash)
+    flashPaddlesColor(CRGB::White);
+    ballDX = 1;                     // Send ball rightwards
+    ballX += ballDX;
 
-    ballDX = 1;                     // Reverse X direction
-    ballX += ballDX;                // Move away from paddle
-
-    // Determine new Y direction based on hit position
-    int hitPos = ballY - paddle1Y;  // 0 = top, 1 = middle, 2 = bottom
+    int hitPos = ballY - paddle1Y;  // 0 = top, 1 = centre, 2 = bottom
     if (hitPos == 0)       ballDY = -1;
-    else if (hitPos == 1)  ballDY = (random(0,10) < 2) ? 0 : (random(0,2) ? 1 : -1); // 20 % neutral
-    else                   ballDY =  1;
+    else if (hitPos == 1)  ballDY = (random(0,10) < 2) ? 0 : (random(0,2) ? 1 : -1);
+    else                    ballDY =  1;
 
     rallyCount++;
-    if (rallyCount >= 4 && ballSpeed > BALL_SPEED_MIN) {
-      ballSpeed -= 5;               // Speed up after a few successful hits
-      rallyCount = 0;
-    }
+    if (rallyCount >= 4 && ballSpeed > BALL_SPEED_MIN) { ballSpeed -= 5; rallyCount = 0; }
   }
   // ----- Right paddle ---------------------------------------------------
   else if (ballX == MATRIX_WIDTH - 1 &&
            ballY >= paddle2Y && ballY < paddle2Y + PADDLE_HEIGHT) {
-    // Flash paddle white (visual feedback)
-    for (int i = 0; i < PADDLE_HEIGHT; i++) setPixel(MATRIX_WIDTH - 1, paddle2Y + i, CRGB::White);
-    FastLED.show(); delay(10);
-
-    ballDX = -1;                    // Reverse X direction
-    ballX += ballDX;                // Move away from paddle
+    flashPaddlesColor(CRGB::White);
+    ballDX = -1;                    // Send ball leftwards
+    ballX += ballDX;
 
     int hitPos = ballY - paddle2Y;
     if (hitPos == 0)       ballDY = -1;
     else if (hitPos == 1)  ballDY = (random(0,10) < 2) ? 0 : (random(0,2) ? 1 : -1);
-    else                   ballDY =  1;
+    else                    ballDY =  1;
 
     rallyCount++;
-    if (rallyCount >= 4 && ballSpeed > BALL_SPEED_MIN) {
-      ballSpeed -= 5;
-      rallyCount = 0;
-    }
+    if (rallyCount >= 4 && ballSpeed > BALL_SPEED_MIN) { ballSpeed -= 5; rallyCount = 0; }
   }
-#else                                      // Classic straight‑bounce version
+#else
+  // ----- Classic straight bounce (no angles) -----------------------------
   if (ballX == 0 && ballY >= paddle1Y && ballY < paddle1Y + PADDLE_HEIGHT) {
-    for (int i = 0; i < PADDLE_HEIGHT; i++) setPixel(0, paddle1Y + i, CRGB::White);
-    FastLED.show(); delay(10);
+    flashPaddlesColor(CRGB::White);
     ballDX = -ballDX;
     ballX += ballDX;
     rallyCount++;
     if (rallyCount >= 4 && ballSpeed > BALL_SPEED_MIN) { ballSpeed -= 5; rallyCount = 0; }
   } else if (ballX == MATRIX_WIDTH - 1 &&
              ballY >= paddle2Y && ballY < paddle2Y + PADDLE_HEIGHT) {
-    for (int i = 0; i < PADDLE_HEIGHT; i++) setPixel(MATRIX_WIDTH - 1, paddle2Y + i, CRGB::White);
-    FastLED.show(); delay(10);
+    flashPaddlesColor(CRGB::White);
     ballDX = -ballDX;
     ballX += ballDX;
     rallyCount++;
@@ -297,7 +288,7 @@ void updateBall() {
 #if !SCOREBOARD_ENABLED
     Serial.print("Score: P1 "); Serial.print(score1); Serial.print(" - P2 "); Serial.println(score2);
 #endif
-    flashPaddles();                   // <‑‑ NEW: paddle‑only flash
+    flashPaddles();                   // Paddle‑only flash on a point
     resetBall(true);
   } else if (ballX >= MATRIX_WIDTH) { // Left player scores
     score1++;
@@ -305,7 +296,7 @@ void updateBall() {
 #if !SCOREBOARD_ENABLED
     Serial.print("Score: P1 "); Serial.print(score1); Serial.print(" - P2 "); Serial.println(score2);
 #endif
-    flashPaddles();                   // <‑‑ NEW: paddle‑only flash
+    flashPaddles();                   // Paddle‑only flash on a point
     resetBall(true);
   }
 }
@@ -315,8 +306,7 @@ void updateBall() {
    -------------------------------------------------------------- */
 void resetBall(bool withAnimation) {
   if (withAnimation) {
-    // Previously we called rainbowWave() which painted the whole matrix.
-    // Now we call rainbowPaddle() which paints a moving rainbow **only on the paddles**.
+    // Previously we called a full‑matrix rainbow.  Now we call the paddle‑only version.
     rainbowPaddle();
   }
 
@@ -357,10 +347,8 @@ void loop() {
     ballSpeed = BALL_SPEED_START;
     FastLED.setBrightness(30);
 
-    // Quick visual cue for a manual reset
-    fill_solid(leds, NUM_LEDS, CRGB::Purple);
-    FastLED.show(); delay(100);
-    FastLED.clear(); FastLED.show(); delay(100);
+    // Paddle‑only flash to indicate a manual reset
+    flashResetIndicator();
 
     resetBall(false);
 
@@ -371,23 +359,20 @@ void loop() {
 
   // ----- Win condition --------------------------------------------------
   if (score1 >= WINNING_SCORE || score2 >= WINNING_SCORE) {
-    FastLED.clear();
     CRGB winColor = (score1 >= WINNING_SCORE) ? CRGB::Blue : CRGB::Green;
     for (int i = 0; i < 5; i++) {
-      fill_solid(leds, NUM_LEDS, winColor);
-      FastLED.show(); delay(200);
-      fill_solid(leds, NUM_LEDS, CRGB::Black);
-      FastLED.show(); delay(200);
+      flashWinPaddles(winColor);    // Paddle‑only win flash
+      delay(200);
     }
     score1 = 0;
     score2 = 0;
     resetBall(false);
   }
 
-  // ----- Read potentiometers (with dummy reads for ADC stability) -----
-  analogRead(POT1_PIN);                     // Dummy read
+  // ----- Read potentiometers (dummy reads for ADC stability) -----
+  analogRead(POT1_PIN);                 // Dummy read
   int pot1 = analogRead(POT1_PIN);
-  analogRead(POT2_PIN);                     // Dummy read
+  analogRead(POT2_PIN);                 // Dummy read
   int pot2 = analogRead(POT2_PIN);
 
   paddle1Y = map(pot1, 0, 1023,

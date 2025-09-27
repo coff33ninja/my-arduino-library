@@ -2,7 +2,7 @@
 
 A comprehensive library of Arduino LED projects featuring games, effects, and interactive applications for WS2812B LED matrices and strips.
 
-![Collection](https://img.shields.io/badge/Projects-9_In_Progress-yellow) ![Hardware](https://img.shields.io/badge/Hardware-Arduino_|_ESP32-blue) ![LEDs](https://img.shields.io/badge/LEDs-WS2812B-orange)
+![Collection](https://img.shields.io/badge/Projects-13_In_Progress-yellow) ![Hardware](https://img.shields.io/badge/Hardware-Arduino_|_ESP32-blue) ![LEDs](https://img.shields.io/badge/LEDs-WS2812B-orange)
 
 > [!NOTE]
 > This is just the beginning of my experimentation—many more projects are on the way! I plan to add detailed wiring diagrams and pictures for all projects to better showcase the concepts and final designs.
@@ -18,6 +18,9 @@ All projects in this collection are developed and tested on my first prototype: 
 |---|---|---|---|
 | **[Pong Game](./Interactive%20Games/README_Pong_Game.md)** | Two-player Pong with dynamic ball physics | 220 (10×22) | Smoothed controls, rally speed, visual feedback |
 | **[Dino Runner](./Interactive%20Games/README_Dino_Game.md)** | Chrome Dino-inspired endless runner | 220 (10×22) | Jump/duck, particles, advanced physics |
+| **[Snake Game](./Interactive%20Games/README_Snake_Game.md)** | Classic snake with growing tail & progressive speed | 220 (10x22) | Growing tail, progressive speed, anti-reverse logic |
+| **[Breakout Game](./Interactive%20Games/README_Breakout_Game.md)** | Arkanoid-style game with power-ups & physics | 220 (10x22) | Power-ups, advanced physics, progressive levels |
+| **[Maze Runner](./Interactive%20Games/README_Maze_Runner.md)** | Procedural maze with A* pathfinding & hints | 220 (10x22) | Procedural generation, A* pathfinding, hint system |
 
 ### **Creative Tools**
 | Project | Description | LEDs | Features |  
@@ -29,6 +32,7 @@ All projects in this collection are developed and tested on my first prototype: 
 |---|---|---|---|
 | **[Sharingan](./Visual%20Effects/README_Sharingan.md)** | A mesmerizing animation of the Sharingan eye | 220 (10×22) | Spinning tomoe, pulsing iris |
 | **[Game of Life](./Visual%20Effects/README_GameOfLife.md)** | A simulation of Conway's Game of Life | 220 (10×22) | Cellular automaton, random start |
+| **[Cellular Automata](./Visual%20Effects/README_Cellular_Automata.md)** | Simulator with 8 rule systems & interactive controls | 220 (10x22) | 8 automata rules, interactive controls, multi-state cells |
 | **[Music Visualizer](./Visual%20Effects/README_Music_Visualizer.md)** | Real-time audio spectrum analyzer | 220 (10×22) | FFT analysis, 7-bar visualizer, mic input |
 | **[Effects Playlist](./Visual%20Effects/README_LED_Effects_Playlist.md)** | 8 professional effects with auto-cycle | 220 (10×22) | Fireworks, fire, rainbow, particles |
 | **[Liquid Cooler](./Visual%20Effects/README_Liquid_Cooler.md)** | PC cooling simulation with temperature | 20 (linear) | Multi-zone, thermal response, warnings |
@@ -58,6 +62,10 @@ Dino Game:        10×22 = 220 LEDs (serpentine)
 Effects Playlist: 10×22 = 220 LEDs (serpentine)
 Matrix Driver:    10×22 = 220 LEDs (serpentine)
 Sharingan:        10×22 = 220 LEDs (serpentine)
+Snake Game:       10x22 = 220 LEDs (serpentine)
+Breakout Game:    10x22 = 220 LEDs (serpentine)
+Maze Runner:      10x22 = 220 LEDs (serpentine)
+Cellular Automata:10x22 = 220 LEDs (serpentine)
 Liquid Cooler:    20 LEDs (linear strip)
 ```
 
@@ -81,9 +89,9 @@ Each project includes comprehensive documentation:
 
 ### **1. Choose Your Project**
 Select based on your hardware and interests:
-- **Gaming**: Pong or Dino Runner for interactive entertainment
+- **Gaming**: Pong, Dino Runner, Snake, Breakout, or Maze Runner for interactive entertainment
 - **Art**: Drawing Machine for creative expression  
-- **Display**: Sharingan, Game of Life, Music Visualizer, or Effects Playlist for a dynamic show
+- **Display**: Sharingan, Game of Life, Cellular Automata, Music Visualizer, or Effects Playlist for a dynamic show
 - **PC Modding**: Liquid Cooler for system monitoring
 - **Development**: Matrix Driver to create your own PC-controlled display
 
@@ -123,10 +131,14 @@ LED Count -> Recommended Power Supply:
 - **Pong Game**: Game logic, collision detection, scoring
 - **Music Visualizer**: FFT and audio processing
 - **Game of Life**: Algorithmic simulation
+- **Snake Game**: Classic game logic with progressive difficulty
 
 ### **Advanced**  
 - **Dino Game**: Complex physics, particle systems, AI features
 - **Matrix Driver**: Requires a separate program to send serial commands
+- **Breakout Game**: Advanced physics, power-ups, and level management
+- **Maze Runner**: Procedural generation and A* pathfinding AI
+- **Cellular Automata**: Multiple complex rule systems and interactive controls
 
 ## 🛠️ Common Code Patterns
 

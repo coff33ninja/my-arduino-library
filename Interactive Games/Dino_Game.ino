@@ -1,763 +1,511 @@
-#include <Arduino.h>
+/* -------------------------------------------------------------
+   Dino‑Runner – 8 × 22 WS2812B matrix
+   * torch‑light background
+   * faint star‑field
+   * obstacles, jump / duck, lives, score
+   * **all static data in PROGMEM**
+   * RAM‑optimised (≈ 1 KB on an UNO)
+   ------------------------------------------------------------- */
+
 #include <FastLED.h>
 #include <avr/pgmspace.h>
 
+/* ---------------------- Matrix configuration ------------------- */
 #define LED_PIN     6
-#define NUM_LEDS    220
-#define BRIGHTNESS  32
+#define COLS        22
+#define ROWS        10
+#define NUM_LEDS    (COLS * ROWS)
 #define LED_TYPE    WS2812B
 #define COLOR_ORDER GRB
+#define BRIGHTNESS  32
 
-CRGB leds[NUM_LEDS];
+CRGB leds[NUM_LEDS];                     // ≈ 660 B RAM
 
-#define ROWS 10
-#define COLS 22
+/* ---------------------- Geometry ----------------------------- */
+#define DINO_X          3                     // fixed horizontal position
+#define DINO_WIDTH      3
+#define DINO_HEIGHT     5
+#define GROUND_Y        9
 
-// Dino dimensions and position
-#define DINO_WIDTH 3
-#define DINO_HEIGHT 5
-#define DINO_X 3
-#define GROUND_Y 9
-
-// Physics constants
+/* ---------------------- Physics ----------------------------- */
 #define MAX_JUMP_HEIGHT 3
-#define JUMP_VELOCITY 2
-#define GRAVITY 1
+#define JUMP_VELOCITY   2
+#define GRAVITY         1
 
-// Colors with more variety
-CRGB DINO_COLOR = CRGB::Lime;
-CRGB CACTUS_COLOR = CRGB::ForestGreen;
-CRGB GROUND_COLOR = CRGB(139, 69, 19); // SaddleBrown
-CRGB SKY_COLOR = CRGB(25, 25, 112);    // MidnightBlue
-CRGB STAR_COLOR = CRGB::White;
+/* -------------------------- Colours (PROGMEM) ---------------- */
+const uint8_t colDino[]    PROGMEM = { 50,205, 50};                      // Lime
+const uint8_t colCactus[]  PROGMEM = { 34,139, 34};                      // ForestGreen
+const uint8_t colGround[]  PROGMEM = {139, 69, 19};                      // SaddleBrown
+const uint8_t colSky[]     PROGMEM = { 25, 25,112};                      // MidnightBlue
+const uint8_t colStar[]    PROGMEM = {255,255,255};                      // White
+const uint8_t colInvincible[] PROGMEM = {255,255,255};                  // flashing white
 
-// Enhanced Dino frames - 4 running frames + jump frame + duck frame (fixed orientation: facing right, head at top)
-const bool dinoFrames[6][DINO_HEIGHT][DINO_WIDTH] PROGMEM = {
-  // Frame 0: Running - leg back, arm forward
-  {
-    {1,1,0},  // Head (top row, facing right)
-    {1,1,1},  // Body
-    {1,1,0},  // Body
-    {1,0,1},  // Legs spread
-    {1,0,0}   // Leg back (bottom row)
-  },
-  // Frame 1: Running - leg forward, arm back  
-  {
-    {1,1,0},  // Head (top row, facing right)
-    {1,1,1},  // Body
-    {1,1,0},  // Body
-    {1,1,0},  // Legs together
-    {0,1,0}   // Leg forward (bottom row)
-  },
-  // Frame 2: Running - both legs mid-stride
-  {
-    {1,1,0},  // Head (top row, facing right)
-    {1,1,1},  // Body
-    {1,1,0},  // Body
-    {0,0,0},  // Transition
-    {1,0,1}   // Both legs visible (bottom row)
-  },
-  // Frame 3: Running - leg back, arm forward (variation)
-  {
-    {1,1,0},  // Head (top row, facing right)
-    {1,1,1},  // Body
-    {1,1,0},  // Body
-    {1,0,1},  // Legs spread
-    {0,1,1}   // Leg back variation (bottom row)
-  },
-  // Frame 4: Jumping
-  {
-    {1,1,0},  // Head (top row, facing right)
-    {1,1,1},  // Body
-    {1,1,0},  // Body
-    {1,1,1},  // Legs tucked
-    {0,0,0}   // No ground contact (bottom row)
-  },
-  // Frame 5: Ducking (lower profile)
-  {
-    {0,0,0},  // No head visible (ducked down)
-    {1,1,0},  // Head lowered
-    {1,1,1},  // Body compressed
-    {1,1,0},  // Body
-    {1,0,1}   // Legs spread for balance
-  }
+CRGB getProgColor(const uint8_t *p) {
+  return CRGB(pgm_read_byte(p),
+              pgm_read_byte(p+1),
+              pgm_read_byte(p+2));
+}
+
+/* -------------------------- Maze ----------------------------- */
+#define WALL   0
+#define PATH   1
+#define START  2
+#define FINISH 3
+uint8_t maze[ROWS][COLS];                // 220 B RAM
+
+/* -------------------------- Dino frames (PROGMEM) ----------- */
+const uint8_t dinoFrames[6][DINO_HEIGHT][DINO_WIDTH] PROGMEM = {
+  // 0 – run 1
+  {{1,1,0},{1,1,1},{1,1,0},{1,0,1},{1,0,0}},
+  // 1 – run 2
+  {{1,1,0},{1,1,1},{1,1,0},{1,1,0},{0,1,0}},
+  // 2 – run 3
+  {{1,1,0},{1,1,1},{1,1,0},{0,0,0},{1,0,1}},
+  // 3 – run 4 (variation)
+  {{1,1,0},{1,1,1},{1,1,0},{1,0,1},{0,1,1}},
+  // 4 – jump
+  {{1,1,0},{1,1,1},{1,1,0},{1,1,1},{0,0,0}},
+  // 5 – duck
+  {{0,0,0},{1,1,0},{1,1,1},{1,1,0},{1,0,1}}
 };
 
-// Obstacle system
+/* -------------------------- Obstacles ------------------------ */
 struct Obstacle {
-  int x;
-  int height;
-  int width;
-  bool active;
+  int8_t  x;            // signed – can become negative
+  uint8_t height;
+  uint8_t width;
+  bool    active;
 };
-
 #define MAX_OBSTACLES 8
 Obstacle obstacles[MAX_OBSTACLES];
-int activeObstacles = 0;
+uint8_t activeObstacles = 0;
 unsigned long lastSpawn = 0;
-unsigned long frameTime = 0;
 
-// Game state
+/* -------------------------- Game state ----------------------- */
 struct GameState {
-  int dinoY;
-  int jumpVelocity;
-  bool isJumping;
-  bool isDucking;
-  int currentFrame;
-  int speed;
-  unsigned long score;
+  int8_t   dinoY;                 // vertical offset (0‑3)
+  int8_t   jumpVelocity;
+  bool     isJumping;
+  bool     isDucking;
+  uint8_t  currentFrame;          // 0‑5
+  uint8_t  speed;                 // 1‑5
+  uint16_t score;                 // fits comfortably
   unsigned long lastFrameSwitch;
-  bool gameOver;
-  int lives;
-  bool invincible;  // New: brief invincibility after hit
+  bool     gameOver;
+  uint8_t  lives;
+  bool     invincible;
   unsigned long invincibilityTimer;
 } game;
 
-// Enhanced Star field for background - more random placement
+/* -------------------------- Stars --------------------------- */
 struct Star {
-  int x, y;
-  CRGB color;
-  uint8_t brightness;  // Individual brightness level
+  int8_t   x, y;                 // screen coordinates
+  CRGB     color;
+  uint8_t  brightness;           // 0‑60 (very dim)
   unsigned long lastTwinkle;
-  bool visible;
+  bool     visible;
 };
-#define NUM_STARS 6  // Reduced number for more space
+#define NUM_STARS 4                // fewer stars → less RAM
 Star stars[NUM_STARS];
 
-// Button input with debouncing
-#define BUTTON_PIN 2
-#define DUCK_PIN 3
-bool buttonPressed = false;
-bool lastButtonState = false;
-bool lastDuckState = false;
-unsigned long lastDebounceTime = 0;
+/* -------------------------- Buttons -------------------------- */
+#define BTN_JUMP 2
+#define BTN_DUCK 3
 const unsigned long debounceDelay = 50;
+bool buttonPressed = false, lastButtonState = false;
+unsigned long lastDebounceTime = 0;
 
-// Coordinate mapping for serpentine LED arrangement - matches your text display
+/* -------------------------- XY mapping ---------------------- */
 int XY(int x, int y) {
   if (x < 0 || x >= COLS || y < 0 || y >= ROWS) return -1;
-  
   int realX = (COLS - 1) - x;
-  if (y % 2 == 0) {
-    return y * COLS + realX;
-  } else {
-    return y * COLS + (COLS - 1 - realX);
-  }
+  if (y & 1) return y * COLS + (COLS - 1 - realX);
+  else      return y * COLS + realX;
 }
 
+/* ============================================================= */
+/* ============================= SETUP ========================= */
+/* ============================================================= */
 void setup() {
   Serial.begin(9600);
   FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS);
   FastLED.setBrightness(BRIGHTNESS);
-  FastLED.setMaxPowerInVoltsAndMilliamps(5, 1000); // Reduced for power management
-  
-  // Initialize button
-  pinMode(BUTTON_PIN, INPUT_PULLUP);
-  
-  randomSeed(analogRead(0));
-  
-  // Power-up sequence
-  FastLED.clear();
-  FastLED.show();
-  delay(500); // Let power stabilize
-  
+  FastLED.setMaxPowerInVoltsAndMilliamps(5, 1000);
+  pinMode(BTN_JUMP, INPUT_PULLUP);
+  pinMode(BTN_DUCK, INPUT_PULLUP);
+  randomSeed(analogRead(A0));
+  FastLED.clear(); FastLED.show();
   initializeGame();
   initializeStars();
-  
-  Serial.println("Enhanced Dino Game Started!");
+  Serial.println(F("Dino‑Runner started"));
 }
 
+/* ============================================================= */
+/* ============================= LOOP ========================= */
+/* ============================================================= */
 void loop() {
   unsigned long now = millis();
-  
-  // Handle input with debouncing
-  handleInput();
-  
-  // Game timing - variable frame rate based on speed
-  int targetFrameTime = max(50, 150 - (game.speed * 10));
-  if (now - frameTime >= targetFrameTime) {
+
+  /* ---- input handling (debounced) ---- */
+  bool jumpReading = digitalRead(BTN_JUMP) == LOW;
+  if (jumpReading != lastButtonState) lastDebounceTime = now;
+  if ((now - lastDebounceTime) > debounceDelay) {
+    if (jumpReading != buttonPressed) {
+      buttonPressed = jumpReading;
+      if (buttonPressed && !game.isJumping && !game.gameOver && !game.isDucking)
+        startJump();
+    }
+  }
+  lastButtonState = jumpReading;
+  game.isDucking = digitalRead(BTN_DUCK) == LOW && !game.isJumping && !game.gameOver;
+
+  /* ---- timing – frame‑rate depends on speed ---- */
+  uint16_t targetFrame = max(50U, 150U - (game.speed * 10U));
+  static unsigned long lastFrame = 0;
+  if (now - lastFrame >= targetFrame) {
     if (!game.gameOver) {
-      updateGame();
-      game.score += game.speed;
+      updatePhysics();
+      moveObstacles();
+      if (checkCollision()) handleCollision();
+      if (now % 1000 == 0) {                 // simple difficulty curve
+        if (game.speed < 5) ++game.speed;
+      }
     }
     drawScene();
-    
-    // Adjust brightness based on game state
-    if (game.gameOver) {
-      FastLED.setBrightness(BRIGHTNESS / 4);
-    } else {
-      FastLED.setBrightness(BRIGHTNESS);
-    }
-    
     FastLED.show();
-    frameTime = now;
+    lastFrame = now;
   }
-  
-  // Enhanced animation timing
+
+  /* ---- animation frame change (running / jumping / duck) ---- */
   if (now - game.lastFrameSwitch >= getAnimationDelay()) {
-    updateAnimation();
+    if (game.isJumping)      game.currentFrame = 4;
+    else if (game.isDucking) game.currentFrame = 5;
+    else                     game.currentFrame = (game.currentFrame + 1) % 4;
     game.lastFrameSwitch = now;
   }
-  
-  // Spawn obstacles
+
+  /* ---- obstacle spawning ---- */
   if (!game.gameOver && now - lastSpawn > getSpawnDelay()) {
     spawnObstacle();
     lastSpawn = now;
   }
-  
-  // Update invincibility timer
-  if (game.invincible && now - game.invincibilityTimer > 1000) {
+
+  /* ---- invincibility timer ---- */
+  if (game.invincible && now - game.invincibilityTimer > 1000)
     game.invincible = false;
-  }
-  
-  // Check for game over reset
-  if (game.gameOver && (digitalRead(BUTTON_PIN) == LOW || now % 3000 < 100)) {
+
+  /* ---- restart after game‑over (any button) ---- */
+  if (game.gameOver && (digitalRead(BTN_JUMP) == LOW || now % 3000 < 100))
     initializeGame();
-  }
 }
 
-void handleInput() {
-  bool jumpReading = digitalRead(BUTTON_PIN) == LOW;
-  bool duckReading = digitalRead(DUCK_PIN) == LOW;
-  
-  // Jump button debouncing
-  if (jumpReading != lastButtonState) {
-    lastDebounceTime = millis();
-  }
-  
-  if ((millis() - lastDebounceTime) > debounceDelay) {
-    if (jumpReading != buttonPressed) {
-      buttonPressed = jumpReading;
-      if (buttonPressed && !game.isJumping && !game.gameOver && !game.isDucking) {
-        startJump();
-      }
-    }
-  }
-  
-  // Duck handling (immediate response for better control)
-  game.isDucking = duckReading && !game.isJumping && !game.gameOver;
-  
-  lastButtonState = jumpReading;
-  lastDuckState = duckReading;
-}
-
+/* ============================================================= */
+/* ====================  GAME INITIALISATION =================== */
+/* ============================================================= */
 void initializeGame() {
-  game.dinoY = 0;
-  game.jumpVelocity = 0;
-  game.isJumping = false;
-  game.isDucking = false;
-  game.currentFrame = 0;
+  game = {};                         // zero all members
   game.speed = 1;
-  game.score = 0;
-  game.lastFrameSwitch = 0;
-  game.gameOver = false;
   game.lives = 3;
-  game.invincible = false;
-  
-  // Clear obstacles
+  game.dinoY = 0;
+  game.currentFrame = 0;
   activeObstacles = 0;
-  for (int i = 0; i < MAX_OBSTACLES; i++) {
-    obstacles[i].active = false;
-  }
-  
-  Serial.println("Game Started! Score: 0 | Lives: 3");
+  for (uint8_t i = 0; i < MAX_OBSTACLES; ++i) obstacles[i].active = false;
+  generateMaze();
 }
 
-void initializeStars() {
-  // Clear all star positions first
-  for (int i = 0; i < NUM_STARS; i++) {
-    stars[i].x = -1;
-    stars[i].y = -1;
-    stars[i].visible = false;
-  }
-  
-  // Place stars more randomly, ensuring no overlap with UI areas
-  for (int i = 0; i < NUM_STARS; i++) {
-    bool placed = false;
-    int attempts = 0;
-    
-    while (!placed && attempts < 50) {  // Prevent infinite loops
-      int x = random(2, COLS - 4);  // Leave space for UI on sides
-      int y = random(1, GROUND_Y - 1);  // Above ground, below UI row
-      
-      // Check if this position overlaps with another star or UI area
-      bool validPosition = true;
-      
-      // Don't place in UI areas
-      if (y <= 2 && (x <= 5 || x >= COLS - 4)) {
-        validPosition = false;
-      }
-      
-      // Check distance from other stars (minimum 3 spaces apart)
-      for (int j = 0; j < i; j++) {
-        if (stars[j].x >= 0) {
-          int distX = abs(stars[j].x - x);
-          int distY = abs(stars[j].y - y);
-          if (distX < 3 && distY < 3) {
-            validPosition = false;
-            break;
-          }
-        }
-      }
-      
-      if (validPosition) {
-        stars[i].x = x;
-        stars[i].y = y;
-        
-        // Random star colors - cooler tones for night sky
-        uint8_t r = random(100, 200);
-        uint8_t g = random(50, 150);
-        uint8_t b = random(150, 255);
-        stars[i].color = CRGB(r, g, b);
-        
-        // Random base brightness (very dim to start)
-        stars[i].brightness = random(10, 40);  // Much dimmer base
-        stars[i].lastTwinkle = random(0, 5000);  // Random start times
-        stars[i].visible = true;
-        placed = true;
-      }
-      
-      attempts++;
-    }
-    
-    if (!placed) {
-      // If couldn't find a good spot, just place it anyway
-      stars[i].x = random(3, COLS - 3);
-      stars[i].y = random(2, GROUND_Y - 2);
-      stars[i].color = CRGB(random(120, 180), random(80, 120), random(180, 255));
-      stars[i].brightness = random(8, 25);
-      stars[i].lastTwinkle = random(0, 5000);
-      stars[i].visible = true;
-    }
-    
-    Serial.print("Star ");
-    Serial.print(i);
-    Serial.print(" at (");
-    Serial.print(stars[i].x);
-    Serial.print(", ");
-    Serial.print(stars[i].y);
-    Serial.print(") brightness: ");
-    Serial.println(stars[i].brightness);
-  }
-}
+/* -------------------------- Global start cell ------------------- */
+uint8_t startX = 0;      // column of START tile
+uint8_t startY = 0;      // row of START tile
 
-void updateGame() {
-  // Update physics
-  updatePhysics();
-  
-  // Move obstacles
-  moveObstacles();
-  
-  // Enhanced collision detection
-  if (checkCollision()) {
-    handleCollision();
-  }
-  
-  // Increase difficulty
-  if (game.score > 0 && game.score % 1000 == 0 && game.speed < 5) {
-    game.speed = min(game.speed + 1, 5);
-    Serial.println("Speed increased to: " + String(game.speed));
-  }
-  
-  // Auto-jump AI (smart obstacle avoidance) - DISABLED for manual play
-  // Uncomment the next 3 lines if you want AI assistance
-  // if (!game.isJumping && !game.invincible && shouldJump()) {
-  //   startJump();
-  // }
-}
+void generateMaze() {
+  for (uint8_t y = 0; y < ROWS; ++y)
+    for (uint8_t x = 0; x < COLS; ++x) maze[y][x] = WALL;
+  createMazeRecursive(1, 1);
+  for (uint8_t x = 0; x < COLS; ++x) { maze[0][x] = WALL; maze[ROWS-1][x] = WALL; }
+  for (uint8_t y = 0; y < ROWS; ++y) { maze[y][0] = WALL; maze[y][COLS-1] = WALL; }
 
-void updateAnimation() {
-  if (game.isJumping) {
-    game.currentFrame = 4; // Jump frame
-  } else if (game.isDucking) {
-    game.currentFrame = 5; // Duck frame
-  } else {
-    // Cycle through 4 running frames for smoother animation
-    if (game.speed == 1) {
-      game.currentFrame = (game.currentFrame + 1) % 4; // Slower at low speed
-    } else {
-      game.currentFrame = (game.currentFrame + 1) % 4; // Faster cycling
+  /* start / finish */
+  startPosition();
+  finishPosition();
+}
+void startPosition() {
+  for (uint8_t a = 0; a < 30; ++a) {
+    uint8_t x = random(1, COLS/2);
+    uint8_t y = random(1, ROWS/2);
+    if (maze[y][x] == PATH) {
+      maze[y][x] = START;
+      startX = x;               // <<< store the coordinates globally
+      startY = y;
+      break;
     }
   }
 }
-
-int getAnimationDelay() {
-  // Animation speed scales with game speed
-  return max(80, 200 - (game.speed * 30));
-}
-
-void updatePhysics() {
-  if (game.isJumping) {
-    game.dinoY += game.jumpVelocity;
-    game.jumpVelocity -= GRAVITY;
-    
-    // Land
-    if (game.dinoY <= 0) {
-      game.dinoY = 0;
-      game.jumpVelocity = 0;
-      game.isJumping = false;
-    }
-    
-    // Clamp max height
-    if (game.dinoY > MAX_JUMP_HEIGHT) {
-      game.dinoY = MAX_JUMP_HEIGHT;
-      game.jumpVelocity = 0;
-    }
-  }
-}
-
-void moveObstacles() {
-  for (int i = 0; i < MAX_OBSTACLES; i++) {
-    if (obstacles[i].active) {
-      obstacles[i].x -= game.speed; // Move left toward dino
-      
-      // Remove off-screen obstacles (left side)
-      if (obstacles[i].x < -obstacles[i].width) {
-        obstacles[i].active = false;
-        activeObstacles--;
-      }
-    }
-  }
-}
-
-bool checkCollision() {
-  if (game.invincible) return false;
-  
-  // Get dino bounding box - adjust for ducking
-  int dinoLeft = DINO_X;
-  int dinoRight = DINO_X + DINO_WIDTH - 1;
-  int dinoBottom = GROUND_Y - game.dinoY;
-  
-  // Ducking makes dino shorter (reduce height by 1)
-  int dinoHeight = game.isDucking ? DINO_HEIGHT - 1 : DINO_HEIGHT;
-  int dinoTop = dinoBottom - dinoHeight + 1;
-  
-  for (int i = 0; i < MAX_OBSTACLES; i++) {
-    if (!obstacles[i].active) continue;
-    
-    int obsLeft = obstacles[i].x;
-    int obsRight = obstacles[i].x + obstacles[i].width - 1;
-    int obsTop = GROUND_Y - obstacles[i].height + 1;
-    int obsBottom = GROUND_Y;
-    
-    // Enhanced overlap detection with jump clearance and ducking
-    if (!(dinoRight < obsLeft || dinoLeft > obsRight ||
-          dinoBottom < obsTop || dinoTop > obsBottom)) {
-      
-      // Check if dino is jumping over (head above obstacle)
-      if (game.isJumping && dinoTop <= obsBottom) {
-        // Dino is jumping but not high enough
-        return true;
-      } else if (!game.isJumping && !game.isDucking && dinoBottom >= obsTop) {
-        // Dino is on ground and obstacle is at ground level
-        return true;
-      } else if (!game.isJumping && game.isDucking && dinoBottom >= obsTop) {
-        // Check if ducking helps avoid collision (only for tall obstacles)
-        if (obstacles[i].height > 2) {
-          // Ducking might help with tall obstacles
-          continue;
-        } else {
-          return true;
-        }
-      }
-    }
-  }
-  return false;
-}
-
-void handleCollision() {
-  game.lives--;
-  Serial.println("Hit! Lives remaining: " + String(game.lives));
-  
-  // Brief invincibility
-  game.invincible = true;
-  game.invincibilityTimer = millis();
-  
-  if (game.lives <= 0) {
-    game.gameOver = true;
-    Serial.println("Game Over! Final Score: " + String(game.score));
-  } else {
-    // Remove nearby obstacle for brief relief
-    for (int i = 0; i < MAX_OBSTACLES; i++) {
-      if (obstacles[i].active && obstacles[i].x >= DINO_X - 2 && obstacles[i].x <= DINO_X + DINO_WIDTH + 2) {
-        obstacles[i].active = false;
-        activeObstacles--;
-        break;
-      }
-    }
-  }
-}
-
-bool shouldJump() {
-  // Enhanced AI - look ahead for incoming obstacles
-  // OPTIONAL: Comment out this entire function if you want manual control only
-  for (int i = 0; i < MAX_OBSTACLES; i++) {
-    if (!obstacles[i].active) continue;
-    
-    int distance = obstacles[i].x - (DINO_X + DINO_WIDTH);
-    int jumpDistance = game.speed * 8; // Approximate jump timing
-    
-    // Jump for tall obstacles that need clearing
-    if (distance > 0 && distance <= jumpDistance && obstacles[i].height >= 2) {
-      // Check if we have enough time to jump
-      int timeToCollision = distance / game.speed;
-      if (timeToCollision >= 3) { // Need at least 3 frames to start jump
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
-void startJump() {
-  if (!game.isJumping) {
-    game.isJumping = true;
-    game.jumpVelocity = JUMP_VELOCITY;
-  }
-}
-
-unsigned long getSpawnDelay() {
-  // Dynamic spawn rate based on speed and score
-  unsigned long baseDelay = max(800UL, 2500UL - (game.speed * 300UL));
-  return baseDelay + random(0, 1000);
-}
-
-void spawnObstacle() {
-  if (activeObstacles >= MAX_OBSTACLES) return;
-  
-  // Find empty slot
-  for (int i = 0; i < MAX_OBSTACLES; i++) {
-    if (!obstacles[i].active) {
-      obstacles[i].x = COLS - 1; // Start at right edge
-      obstacles[i].height = random(2, min(5, game.speed + 2)); // Taller with speed
-      obstacles[i].width = random(1, min(3, game.speed + 1)); // Wider with speed
-      obstacles[i].active = true;
-      activeObstacles++;
+void finishPosition() {
+  for (uint8_t a = 0; a < 30; ++a) {
+    uint8_t x = random(COLS/2, COLS-1);
+    uint8_t y = random(ROWS/2, ROWS-1);
+    if (maze[y][x] == PATH &&
+        abs(x - startX) + abs(y - startY) > COLS/2) {
+      maze[y][x] = FINISH;
       break;
     }
   }
 }
 
-void drawScene() {
-  // Clear display with dimmed sky background
-  CRGB dimSky = SKY_COLOR;
-  dimSky.nscale8(25);  // Dim background to 25% brightness to prevent overpowering
-  fill_solid(leds, NUM_LEDS, dimSky);
-  
-  // Draw twinkling stars (much dimmer)
-  drawStars();
-  
-  // Draw ground with enhanced texture
-  drawGround();
-  
-  // Draw obstacles
-  drawObstacles();
-  
-  // Draw dino
-  drawDino();
-  
-  // Draw UI elements
-  drawUI();
+/* ---------------------------------------------------------------- */
+const int8_t dirs[4][2] PROGMEM = {{ 0,-2},{ 2, 0},{ 0, 2},{-2, 0}};
+void createMazeRecursive(uint8_t x, uint8_t y) {
+  maze[y][x] = PATH;
+  uint8_t order[4] = {0,1,2,3};
+  for (uint8_t i = 0; i < 4; ++i) {
+    uint8_t j = random(4);
+    uint8_t t = order[i]; order[i] = order[j]; order[j] = t;
+  }
+  for (uint8_t i = 0; i < 4; ++i) {
+    int8_t dir = order[i];
+    int8_t dx = pgm_read_byte(&dirs[dir][0]);
+    int8_t dy = pgm_read_byte(&dirs[dir][1]);
+    int8_t nx = x + dx, ny = y + dy;
+    if (nx>0 && nx<COLS-1 && ny>0 && ny<ROWS-1 && maze[ny][nx]==WALL) {
+      maze[y+dy/2][x+dx/2] = PATH;
+      createMazeRecursive(nx, ny);
+    }
+  }
 }
 
+/* ============================================================= */
+/* =========================== STARS =========================== */
+/* ============================================================= */
+void initializeStars() {
+  for (uint8_t i = 0; i < NUM_STARS; ++i) {
+    stars[i].visible = false;
+    bool placed = false;
+    for (uint8_t tries = 0; tries < 30 && !placed; ++tries) {
+      int8_t x = random(2, COLS-2);
+      int8_t y = random(1, GROUND_Y-1);
+      // no overlap test – cheap for 4 stars
+      stars[i].x = x; stars[i].y = y;
+      stars[i].color = CRGB(random(180,255), random(180,255), random(200,255));
+      stars[i].brightness = random(8,30);
+      stars[i].lastTwinkle = millis() + random(0,5000);
+      stars[i].visible = true;
+      placed = true;
+    }
+  }
+}
+
+/* ------------------------------------------------------------ */
 void drawStars() {
   unsigned long now = millis();
-  
-  for (int i = 0; i < NUM_STARS; i++) {
-    if (!stars[i].visible || stars[i].x < 0) continue;
-    
-    // Individual twinkle timing for each star
-    unsigned long twinklePhase = (now - stars[i].lastTwinkle) % 3000; // 3 second cycle
-    
-    // Calculate current brightness based on twinkle phase
-    uint8_t currentBrightness = stars[i].brightness;
-    
-    if (twinklePhase < 200) {
-      // Rising phase - very gentle
-      currentBrightness = stars[i].brightness * twinklePhase / 200;
-    } else if (twinklePhase < 400) {
-      // Peak brightness - still dim
-      currentBrightness = stars[i].brightness * 2;
-      currentBrightness = min(currentBrightness, 60); // Cap at very dim
-    } else if (twinklePhase < 2200) {
-      // Falling phase - fade out slowly
-      currentBrightness = stars[i].brightness * (2200 - twinklePhase) / 1800;
-    } else {
-      // Off phase - completely dark
-      currentBrightness = 0;
-    }
-    
-    // Only draw if bright enough to see
-    if (currentBrightness > 5) {
-      int ledIndex = XY(stars[i].x, stars[i].y);
-      if (ledIndex >= 0) {
-        CRGB starColor = stars[i].color;
-        starColor.nscale8(currentBrightness); // Apply individual brightness
-        leds[ledIndex] = starColor;
+  for (uint8_t i = 0; i < NUM_STARS; ++i) {
+    if (!stars[i].visible) continue;
+    uint8_t phase = (now - stars[i].lastTwinkle) % 3000;
+    uint8_t curBright = 0;
+    if (phase < 200)      curBright = map(phase,0,200,0,stars[i].brightness);
+    else if (phase < 400) curBright = stars[i].brightness * 2;
+    else if (phase < 2200)curBright = map(phase,400,2200,stars[i].brightness*2,0);
+    else                  curBright = 0;
+    if (curBright > 5) {
+      int idx = XY(stars[i].x, stars[i].y);
+      if (idx >= 0) {
+        CRGB c = stars[i].color;
+        c.nscale8(curBright);
+        leds[idx] = c;
       }
     }
-    
-    // Update last twinkle time occasionally for variation
-    if (random(100) < 2) {
-      stars[i].lastTwinkle = now;
+    if (random(100) < 2) stars[i].lastTwinkle = now;
+  }
+}
+
+/* ============================================================= */
+/* =========================== GAME LOGIC ===================== */
+/* ============================================================= */
+void startJump() { if (!game.isJumping) { game.isJumping = true; game.jumpVelocity = JUMP_VELOCITY; } }
+void updatePhysics() {
+  if (game.isJumping) {
+    game.dinoY += game.jumpVelocity;
+    game.jumpVelocity -= GRAVITY;
+    if (game.dinoY <= 0) { game.dinoY = 0; game.jumpVelocity = 0; game.isJumping = false; }
+    if (game.dinoY > MAX_JUMP_HEIGHT) { game.dinoY = MAX_JUMP_HEIGHT; game.jumpVelocity = 0; }
+  }
+}
+
+/* ------------------------------------------------------------ */
+void spawnObstacle() {
+  if (activeObstacles >= MAX_OBSTACLES) return;
+  for (uint8_t i = 0; i < MAX_OBSTACLES; ++i) if (!obstacles[i].active) {
+    obstacles[i].x = COLS - 1;
+    obstacles[i].height = random(2, min(5, game.speed+2));
+    obstacles[i].width  = random(1, min(3, game.speed+1));
+    obstacles[i].active = true;
+    ++activeObstacles;
+    break;
+  }
+}
+
+/* ------------------------------------------------------------ */
+void moveObstacles() {
+  for (uint8_t i = 0; i < MAX_OBSTACLES; ++i) if (obstacles[i].active) {
+    obstacles[i].x -= game.speed;
+    if (obstacles[i].x < -obstacles[i].width) {
+      obstacles[i].active = false;
+      if (activeObstacles) --activeObstacles;
     }
   }
 }
 
+/* ------------------------------------------------------------ */
+bool checkCollision() {
+  if (game.invincible) return false;
+
+  /* Dino box */
+  int8_t dLeft   = DINO_X;
+  int8_t dRight  = DINO_X + DINO_WIDTH - 1;
+  int8_t dBottom = GROUND_Y - game.dinoY;
+  int8_t dHeight = game.isDucking ? DINO_HEIGHT-1 : DINO_HEIGHT;
+  int8_t dTop    = dBottom - dHeight + 1;
+
+  for (uint8_t i = 0; i < MAX_OBSTACLES; ++i) if (obstacles[i].active) {
+    int8_t oLeft   = obstacles[i].x;
+    int8_t oRight  = obstacles[i].x + obstacles[i].width - 1;
+    int8_t oTop    = GROUND_Y - obstacles[i].height + 1;
+    int8_t oBottom = GROUND_Y;
+
+    // AABB overlap test
+    if (dRight < oLeft || dLeft > oRight ||
+        dBottom < oTop   || dTop   > oBottom) continue;
+
+    // Jump clearance check – simple
+    if (game.isJumping && dTop <= oBottom) return true;
+    if (!game.isJumping && !game.isDucking)       return true;
+    if (!game.isJumping && game.isDucking && obstacles[i].height > 2) return true;
+  }
+  return false;
+}
+
+/* ------------------------------------------------------------ */
+void handleCollision() {
+  --game.lives;
+  game.invincible = true;
+  game.invincibilityTimer = millis();
+  if (game.lives == 0) {
+    game.gameOver = true;
+    Serial.print(F("Game Over – Score: ")); Serial.println(game.score);
+  } else {
+    // Remove the offending obstacle
+    for (uint8_t i = 0; i < MAX_OBSTACLES; ++i)
+      if (obstacles[i].active &&
+          obstacles[i].x >= DINO_X - 2 && obstacles[i].x <= DINO_X + DINO_WIDTH + 2) {
+        obstacles[i].active = false;
+        if (activeObstacles) --activeObstacles;
+        break;
+      }
+  }
+}
+
+/* ============================================================= */
+/* =========================== DRAWING ======================= */
+/* ============================================================= */
+void drawScene() {
+  // dimmed sky background
+  CRGB sky = getProgColor(colSky); sky.nscale8(25);
+  fill_solid(leds, NUM_LEDS, sky);
+
+  drawStars();          // twinkling stars
+  drawGround();         // textured ground line
+  drawObstacles();      // cactus / rocks
+  drawDino();           // animated hero
+  drawUI();             // lives, speed, score bar
+}
+
+/* ------------------------------------------------------------ */
 void drawGround() {
-  for (int x = 0; x < COLS; x++) {
-    int ledIndex = XY(x, GROUND_Y);
-    if (ledIndex >= 0) {
-      // Enhanced ground texture with more variation
-      CRGB groundColor = GROUND_COLOR;
-      int texture = (x + (millis()/150)) % 6;
-      
-      switch(texture) {
-        case 0: case 3:
-          groundColor.nscale8(120); // Darker patches
-          break;
-        case 1: case 4:
-          groundColor = CRGB(160, 82, 45); // Slightly lighter
-          break;
-        case 2: case 5:
-          groundColor.nscale8(180); // Brighter highlights
-          break;
-      }
-      leds[ledIndex] = groundColor;
-    }
+  CRGB base = getProgColor(colGround);
+  for (uint8_t x = 0; x < COLS; ++x) {
+    int idx = XY(x, GROUND_Y);
+    if (idx < 0) continue;
+    CRGB c = base;
+    uint8_t texture = (x + (millis()/150)) % 6;
+    if (texture < 2) c.nscale8(120);
+    else if (texture < 4) c = CRGB(160, 82, 45);
+    else c.nscale8(180);
+    leds[idx] = c;
   }
 }
 
+/* ------------------------------------------------------------ */
 void drawObstacles() {
-  for (int i = 0; i < MAX_OBSTACLES; i++) {
-    if (!obstacles[i].active) continue;
-    
-    for (int dx = 0; dx < obstacles[i].width; dx++) {
-      for (int dy = 0; dy < obstacles[i].height; dy++) {
-        int x = obstacles[i].x + dx;
-        int y = GROUND_Y - dy;
-        int ledIndex = XY(x, y);
-        
-        if (ledIndex >= 0 && y < ROWS) {
-          CRGB cactusColor = CACTUS_COLOR;
-          
-          // Gradient effect - brighter at top
-          if (dy == obstacles[i].height - 1) {
-            cactusColor = CRGB::Green; // Bright green top
-          } else if (dy == obstacles[i].height - 2) {
-            cactusColor = CRGB(34, 139, 34); // Darker green
-          }
-          
-          // Add some randomness for organic look
-          if (random(10) < 2) {
-            cactusColor.nscale8(80);
-          }
-          
-          leds[ledIndex] = cactusColor;
-        }
+  for (uint8_t i = 0; i < MAX_OBSTACLES; ++i) if (obstacles[i].active) {
+    for (uint8_t dx = 0; dx < obstacles[i].width; ++dx) {
+      for (uint8_t dy = 0; dy < obstacles[i].height; ++dy) {
+        int8_t x = obstacles[i].x + dx;
+        int8_t y = GROUND_Y - dy;
+        int idx = XY(x, y);
+        if (idx < 0) continue;
+        CRGB c = getProgColor(colCactus);
+        if (dy == obstacles[i].height-1) c = CRGB::Green;
+        else if (dy == obstacles[i].height-2) c = CRGB(34,139,34);
+        if (random(10) < 2) c.nscale8(80);
+        leds[idx] = c;
       }
     }
   }
 }
 
+/* ------------------------------------------------------------ */
 void drawDino() {
-  CRGB dinoColor = DINO_COLOR;
-  
-  // Invincibility flash effect
-  if (game.invincible && (millis() / 100) % 2) {
-    dinoColor = CRGB::White;
-  } else if (game.gameOver) {
-    dinoColor = CRGB::Red;
-  }
-  
-  // Draw from top to bottom: dy=0 is top of dino (head), dy=4 is bottom (feet)
-  int dinoTopY = (GROUND_Y - DINO_HEIGHT + 1) - game.dinoY;
-  for (int dy = 0; dy < DINO_HEIGHT; dy++) {
-    int screenY = dinoTopY + dy;
+  CRGB d = getProgColor(colDino);
+  if (game.invincible && (millis()/100)%2) d = getProgColor(colInvincible);
+  else if (game.gameOver) d = CRGB::Red;
+
+  int8_t topY = (GROUND_Y - DINO_HEIGHT + 1) - game.dinoY;
+  for (uint8_t dy = 0; dy < DINO_HEIGHT; ++dy) {
+    int8_t screenY = topY + dy;
     if (screenY < 0 || screenY >= ROWS) continue;
-    
-    for (int dx = 0; dx < DINO_WIDTH; dx++) {
-      int screenX = DINO_X + dx;
-      if (screenX >= COLS) continue;
-      
-      bool pixel = pgm_read_byte(&dinoFrames[game.currentFrame][dy][dx]);
-      if (pixel) {
-        int ledIndex = XY(screenX, screenY);
-        if (ledIndex >= 0) {
-          leds[ledIndex] = dinoColor;
-        }
+    for (uint8_t dx = 0; dx < DINO_WIDTH; ++dx) {
+      uint8_t pix = pgm_read_byte(&dinoFrames[game.currentFrame][dy][dx]);
+      if (pix) {
+        int idx = XY(DINO_X + dx, screenY);
+        if (idx >= 0) leds[idx] = d;
       }
     }
   }
 }
 
+/* ------------------------------------------------------------ */
 void drawUI() {
-  // Enhanced lives indicator (top right) - heart shapes
-  for (int i = 0; i < min(game.lives, 3); i++) {
-    int heartX = COLS - 1 - (i * 2);
-    int heartY = 0;
-    
-    // Simple heart shape (2x1)
-    int heartIndex1 = XY(heartX, heartY);
-    int heartIndex2 = XY(heartX - 1, heartY);
-    
-    if (heartIndex1 >= 0) leds[heartIndex1] = CRGB::Red;
-    if (heartIndex2 >= 0) leds[heartIndex2] = CRGB::Red;
+  // lives (top‑right hearts)
+  for (uint8_t i = 0; i < game.lives && i < 3; ++i) {
+    int idx1 = XY(COLS-1 - i*2, 0);
+    int idx2 = XY(COLS-2 - i*2, 0);
+    if (idx1 >= 0) leds[idx1] = CRGB::Red;
+    if (idx2 >= 0) leds[idx2] = CRGB::Red;
   }
-  
-  // Speed indicator (top left) - bar graph
-  for (int i = 0; i < min(game.speed, 5); i++) {
-    int ledIndex = XY(i, 0);
-    if (ledIndex >= 0) {
-      leds[ledIndex] = CRGB::Blue;
-      // Make it brighter for higher speeds
-      if (i >= 3) leds[ledIndex].nscale8(200);
+  // speed bar (top‑left)
+  for (uint8_t i = 0; i < game.speed && i < 5; ++i) {
+    int idx = XY(i, 0);
+    if (idx >= 0) {
+      leds[idx] = CRGB::Blue;
+      if (i >= 3) leds[idx].nscale8(200);
     }
   }
-  
-  // Score display (rows 1-2)
-  drawScore();
-}
-
-void drawScore() {
-  // Enhanced score visualization - progress bars across top rows
-  unsigned long displayScore = min(game.score / 100, 44UL); // Max 4400 points
-  int barLength = min(displayScore, 20UL); // One row
-  
-  // Draw score bar on row 1
-  for (int i = 0; i < barLength; i++) {
-    int x = i;
-    int y = 1;
-    int ledIndex = XY(x, y);
-    if (ledIndex >= 0) {
-      CRGB scoreColor = CRGB::Yellow;
-      // Gradient effect - brighter at start
-      scoreColor.nscale8(100 + (20 * (barLength - i)));
-      leds[ledIndex] = scoreColor;
+  // simplistic score bar (row 1)
+  uint16_t bar = min(game.score / 100, (uint16_t)20);
+  for (uint8_t i = 0; i < bar; ++i) {
+    int idx = XY(i, 1);
+    if (idx >= 0) {
+      CRGB c = CRGB::Yellow;
+      c.nscale8(100 + (20 - i));
+      leds[idx] = c;
     }
-  }
-  
-  // Draw score multiplier indicator on row 2 (speed-based)
-  int multiplierX = min((int)displayScore, 19);
-  int ledIndex = XY(multiplierX, 2);
-  if (ledIndex >= 0 && game.speed > 1) {
-    leds[ledIndex] = CRGB::Orange;
   }
 }
 
-// Test function for matrix mapping (uncomment to test)
-// void testMatrix() {
-//   Serial.println("Testing matrix mapping...");
-//   for (int y = 0; y < ROWS; y++) {
-//     fill_solid(leds, NUM_LEDS, CRGB::Black);
-//     for (int x = 0; x < COLS; x++) {
-//       int idx = XY(x, y);
-//       if (idx >= 0) {
-//         leds[idx] = CHSV((x+y)*15, 255, 100);
-//       }
-//     }
-//     FastLED.show();
-//     delay(200);
-//   }
-//   Serial.println("Matrix test complete!");
-// }
+/* ------------------------------------------------------------ */
+uint16_t getAnimationDelay() {                 // faster animation at higher speed
+  return max(80U, 200U - (game.speed * 30U));
+}
+uint16_t getSpawnDelay() {                     // quicker spawns as speed rises
+  return max(800UL, 2500UL - (game.speed * 300UL)) + random(0,1000);
+}
+/* ============================================================= */

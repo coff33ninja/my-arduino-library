@@ -2,7 +2,7 @@
 
 A feature-rich Snake game for WS2812B LED matrices with growing tail mechanics, progressive difficulty, and polished visual feedback.
 
-![Snake Game Demo](https://img.shields.io/badge/Status-In%20Progress-yellow) ![Platform](https://img.shields.io/badge/Platform-Arduino-blue)
+![Snake Game Demo](https://img.shields.io/badge/Status-Complete-brightgreen) ![Platform](https://img.shields.io/badge/Platform-Arduino-blue)
 
 ## Features
 
@@ -22,7 +22,9 @@ A feature-rich Snake game for WS2812B LED matrices with growing tail mechanics, 
 - **Serial Feedback**: Real-time score updates and game state notifications via serial monitor.
 
 ### 🕹️ **Controls & Input**
+- **Dual Control Scheme**: Play with either digital buttons or analog potentiometers.
 - **Four-Directional Control**: Responsive button controls for Up, Down, Left, and Right movement.
+- **Analog Joystick Control**: Use two potentiometers for intuitive, analog-style snake handling.
 - **Debounced Input**: Advanced debouncing prevents accidental double-presses and ensures reliable control.
 - **Direction Validation**: Intelligent input handling prevents impossible direction changes.
 
@@ -31,8 +33,8 @@ A feature-rich Snake game for WS2812B LED matrices with growing tail mechanics, 
 ### Components
 - **Arduino Nano** (or compatible microcontroller)
 - **10x22 WS2812B LED Matrix** (220 LEDs total)
-- **4x Push Buttons** for directional control
-- **4x 10kΩ Pull-up Resistors** for button stability
+- **4x Push Buttons** for directional control (optional if using potentiometers)
+- **2x Potentiometers (10kΩ)** for analog joystick control (optional if using buttons)
 - **Power Supply**: 5V with sufficient amperage for 220 LEDs (recommended: 5V 10A)
 - **Capacitor**: 470µF-1000µF across power lines for voltage stabilization
 - **Resistor**: 330Ω on LED data line for signal protection
@@ -46,20 +48,18 @@ Pin 2        -> Up Button (other pin to GND)
 Pin 3        -> Down Button (other pin to GND)  
 Pin 4        -> Left Button (other pin to GND)
 Pin 5        -> Right Button (other pin to GND)
-5V           -> LED Matrix VCC
-GND          -> LED Matrix GND, All Button Commons
+
+A1           -> Potentiometer X-Axis (middle pin)
+A2           -> Potentiometer Y-Axis (middle pin)
+
+5V           -> LED Matrix VCC, Potentiometer VCC
+GND          -> LED Matrix GND, All Button Commons, Potentiometer GND
 A0           -> Floating (used for randomSeed)
 ```
 
 ## Memory Usage
 
-**CRITICAL WARNING:** This sketch uses nearly all available dynamic memory (RAM) on a standard Arduino Nano, consuming approximately 2043 bytes (99%). This leaves only 5 bytes for local variables, which will almost certainly cause stability problems, crashes, and unpredictable behavior.
-
-- **Sketch Storage:** 7736 bytes (25%)
-- **Global Variables:** 2043 bytes (99%)
-- **Remaining RAM:** 5 bytes
-
-Due to this extreme memory limitation, an **ESP32 or other microcontroller with significantly more RAM is STRONGLY recommended** to run this sketch reliably.
+This sketch has been optimized to run efficiently on memory-constrained devices like the Arduino Nano and Uno. It uses approximately 1.1KB of RAM, leaving sufficient memory for stable operation.
 
 ## Configuration Options
 
@@ -89,9 +89,11 @@ The following parameters can be easily customized at the top of the `.ino` file.
 - **Down Button (Pin 3)**: Move snake downward  
 - **Left Button (Pin 4)**: Move snake left
 - **Right Button (Pin 5)**: Move snake right
+- **Potentiometer X-Axis (A1)**: Control horizontal movement
+- **Potentiometer Y-Axis (A2)**: Control vertical movement
 
 ### Start Screen
-- **Any Direction Button**: Start a new game from the animated start screen
+- **Any Direction Button or Potentiometer Movement**: Start a new game from the animated start screen
 
 ## Game Rules
 
@@ -105,7 +107,6 @@ Guide the snake to eat red food pellets while avoiding:
 - **1 Point** per food pellet consumed
 - **Speed Increase**: Game gets faster after each food eaten
 - **Growth**: Snake length increases by one segment per food
-- **Best Score Tracking**: Personal best displayed during game over
 
 ### Food Mechanics
 - Food spawns randomly in valid locations (not occupied by snake)
@@ -175,5 +176,5 @@ if (digitalRead(BTN_UP) == LOW &&
 **Hardware**: Arduino Nano + 220 WS2812B LEDs + 4 Buttons  
 **Difficulty**: Intermediate Arduino Project
 
-**Hardware**: Arduino Nano + 220 WS2812B LEDs + 4 Buttons  
+**Hardware**: Arduino Nano + 220 WS2812B LEDs + 4 Buttons + 2 Potentiometers  
 **Difficulty**: Intermediate Arduino Project

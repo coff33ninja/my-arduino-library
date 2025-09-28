@@ -53,7 +53,7 @@ A0           -> Floating (used for randomSeed)
 ```
 
 ### Matrix Configuration
-- **Dimensions**: 22 columns × 9 rows = 198 LEDs
+- **Dimensions**: 22 columns × 10 rows = 220 LEDs
 - **Layout**: Serpentine wiring (zigzag pattern)
 - **Origin**: Bottom-left corner
 - **Data Flow**: Row 0 (bottom) flows right-to-left, Row 1 flows left-to-right, etc.
@@ -116,7 +116,7 @@ UI:        Red hearts, Blue speed, Yellow score
 - **Performance**: PROGMEM storage for sprite data efficiency
 
 ### Star Field Effect
-- **Count**: 6 strategically placed twinkling stars
+- **Count**: 4 strategically placed twinkling stars
 - **Behavior**: 3-second twinkle cycles with individual timing
 - **Colors**: Random cool tones (blues, purples, whites)
 - **Brightness**: Very dim to avoid overwhelming gameplay
@@ -158,16 +158,16 @@ void testMatrix() {
 #define JUMP_VELOCITY 2        // Initial jump speed
 #define GRAVITY 1              // Downward acceleration
 #define MAX_OBSTACLES 8        // Maximum active obstacles
-#define NUM_STARS 6            // Background star count
+#define NUM_STARS 4            // Background star count
 ```
 
 ### Display Settings
 ```cpp
 #define BRIGHTNESS 32          // LED brightness (0-255)
-#define ROWS 9                 // Matrix height
+#define ROWS 10                 // Matrix height
 #define COLS 22                // Matrix width  
 #define LED_PIN 6              // Data pin
-#define NUM_LEDS 198           // Total LED count
+#define NUM_LEDS 220           // Total LED count
 ```
 
 ## Installation & Setup
@@ -232,6 +232,6 @@ void testMatrix() {
 **🎮 Ready to Play!**  
 *Jump over cacti, duck under obstacles, beat your high score!*
 
-**Hardware**: Arduino Nano + 198 WS2812B LEDs + 2 Buttons  
+**Hardware**: Arduino Nano + 220 WS2812B LEDs + 2 Buttons  
 **Difficulty**: Intermediate Arduino project  
 **Play Time**: Endless (until you lose all lives!)*

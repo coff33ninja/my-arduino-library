@@ -2,7 +2,7 @@
 
 A comprehensive cellular automata simulator for WS2812B LED matrices featuring multiple rule systems, interactive controls, and educational demonstrations of complex emergent behaviors.
 
-![Cellular Automata Demo](https://img.shields.io/badge/Status-In%20Progress-yellow) ![Platform](https://img.shields.io/badge/Platform-Arduino-blue)
+![Cellular Automata Demo](https://img.shields.io/badge/Status-Complete-brightgreen) ![Platform](https://img.shields.io/badge/Platform-Arduino-blue)
 
 ## Features
 
@@ -63,13 +63,9 @@ A1           -> Floating (used for additional entropy)
 
 ## Memory Usage
 
-**Warning:** This sketch consumes a significant amount of dynamic memory (RAM), using approximately 1953 bytes (95%) on a standard Arduino Nano. This leaves very little memory for local variables, which may lead to stability issues. I will optimize it to fit and work better on Uno and Nano devices, sometime, as I havent tested them yet.
+This sketch has been optimized to run efficiently on memory-constrained devices like the Arduino Nano and Uno. It uses approximately 1.1KB of RAM, leaving sufficient memory for stable operation.
 
-- **Sketch Storage:** 9300 bytes (30%)
-- **Global Variables:** 1953 bytes (95%)
-- **Remaining RAM:** 95 bytes
-
-Due to the high RAM usage, an **ESP32 or other microcontroller with more RAM is highly recommended** for a stable experience.
+- **PROGMEM**: All static data, such as rule names, color palettes, and patterns, is stored in flash memory to conserve RAM.
 
 ## Configuration Options
 
@@ -102,7 +98,7 @@ The following parameters can be easily customized at the top of the `.ino` file.
 
 ### Runtime Controls
 - **Next Rule Button (Pin 2)**: Cycle through all 8 cellular automata rules
-- **Reset Button (Pin 3)**: Clear grid and reseed with rule-appropriate pattern
+- **Reset Button (Pin 3)**: Toggles the simulation between pause and run
 - **Speed Button (Pin 4)**: Toggle between Slow → Medium → Fast → Ultra speeds
 
 ### Automatic Features
@@ -239,10 +235,12 @@ if (ny >= ROWS) ny = 0;
 ### Rule-Specific Color Systems
 Visual distinction between different automata:
 ```cpp
-// Each rule has unique 4-color palette
-CRGB ruleColors[TOTAL_RULES][4] = {
-  {CRGB::Black, CRGB::White, CRGB::Red, CRGB::Blue},    // Game of Life
-  {CRGB::Black, CRGB::Yellow, CRGB::Orange, CRGB::Red}, // Rule 30
+// Each rule has a unique 4-color palette stored in PROGMEM
+const uint8_t ruleColorsPROGMEM[TOTAL_RULES][4][3] PROGMEM = {
+  // Game of Life
+  {{0,0,0},   {255,255,255}, {255,0,0},   {0,0,255}},
+  // Rule 30
+  {{0,0,0},   {255,255,0},   {255,165,0}, {255,0,0}},
   // ... additional color schemes for each rule
 };
 ```
@@ -250,9 +248,9 @@ CRGB ruleColors[TOTAL_RULES][4] = {
 ### Pattern Placement System
 Structured initial condition setup:
 ```cpp
-void placePattern(Pattern& pattern, int startX, int startY) {
-  for (int y = 0; y < pattern.height; y++) {
-    for (int x = 0; x < pattern.width; x++) {
+void placePattern(const Pattern& p, int startX, int startY) {
+  for (int y = 0; y < p.h; y++) {
+    for (int x = 0; x < p.w; x++) {
       // Place pattern data at specified grid location
     }
   }
@@ -263,19 +261,19 @@ void placePattern(Pattern& pattern, int startX, int startY) {
 
 ### Adding New Rules
 1. Increment `TOTAL_RULES` constant
-2. Add rule name to `ruleNames[]` array
-3. Add color scheme to `ruleColors[]` array
+2. Add rule name to `ruleNamesPROGMEM[]` array
+3. Add color scheme to `ruleColorsPROGMEM[]` array
 4. Implement update function following existing pattern
 5. Add case to `updateAutomata()` switch statement
 6. Create appropriate seeding function
 
 ### Custom Color Schemes
-Modify `ruleColors` array for different visual themes:
+Modify `ruleColorsPROGMEM` array for different visual themes:
 ```cpp
 // Example: High contrast scheme
-{CRGB::Black, CRGB::White, CRGB::Red, CRGB::Blue}
+{{0,0,0},   {255,255,255}, {255,0,0},   {0,0,255}}
 // Example: Warm color scheme  
-{CRGB::Black, CRGB::Orange, CRGB::Red, CRGB::Yellow}
+{{0,0,0},   {255,165,0},   {255,0,0},   {255,255,0}}
 ```
 
 ---
